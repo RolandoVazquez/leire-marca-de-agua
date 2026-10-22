@@ -1,0 +1,15 @@
+{
+  "name": "Leire - Marca de Agua",
+  "short_name": "Leire",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#d63384",
+  "theme_color": "#d63384",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
