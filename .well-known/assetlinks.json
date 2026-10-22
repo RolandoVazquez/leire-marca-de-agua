@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rolandovazquez.leiremarcaagua",
+      "sha256_cert_fingerprints": [
+        "E7:D4:C6:1F:AD:8B:33:CD:FB:77:EE:9E:09:19:E6:89:B6:DD:1F:8E:FC:C5:2D:B7:DD:F0:8D:3D:CB:26:24:C2"
+      ]
+    }
+  }
+]
