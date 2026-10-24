@@ -30,7 +30,7 @@
       <input type="file" id="input-gallery" accept="image/*" style="display: none;">
       <input type="file" id="input-camera" accept="image/*" capture="environment" style="display: none;">
 
-      <!-- Area del Lienzo / Vista Previa -->
+      <!-- Area de Vista Previa optimizada con Capas DOM -->
       <div class="editor-stage">
         <!-- Estado Inicial: Selector de origen -->
         <div id="upload-box" class="upload-box">
@@ -50,8 +50,14 @@
           </div>
         </div>
 
-        <!-- Canvas donde se renderiza la foto con la marca de agua -->
-        <canvas id="watermark-canvas" class="hidden"></canvas>
+        <!-- Contenedor de Capas para arrastre ultra fluido -->
+        <div id="preview-container" class="hidden" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none;">
+          <img id="preview-img" style="max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none; user-select: none;" alt="Preview">
+          <div id="watermark-layer" style="position: absolute; cursor: grab; user-select: none; font-weight: bold; text-shadow: 0px 0px 6px rgba(0,0,0,0.6); white-space: nowrap; transform: translate(-50%, -50%);">Leire</div>
+        </div>
+
+        <!-- Canvas oculto para procesar la imagen final al descargar -->
+        <canvas id="export-canvas" style="display: none;"></canvas>
       </div>
 
       <!-- Panel de Controles de Edición -->
