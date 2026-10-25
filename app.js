@@ -15,14 +15,24 @@ window.addEventListener('DOMContentLoaded', () => {
   const btnGallery = document.getElementById('btn-gallery');
   const inputCamera = document.getElementById('input-camera');
   const inputGallery = document.getElementById('input-gallery');
+  const inputLogo = document.getElementById('input-logo');
+  const btnUploadLogo = document.getElementById('btn-upload-logo');
   
   const uploadBox = document.getElementById('upload-box');
   const previewContainer = document.getElementById('preview-container');
   const previewImg = document.getElementById('preview-img');
   const watermarkLayer = document.getElementById('watermark-layer');
+  const logoLayer = document.getElementById('logo-layer');
   const exportCanvas = document.getElementById('export-canvas');
   const exportCtx = exportCanvas.getContext('2d');
   const editorControls = document.getElementById('editor-controls');
+
+  // Nuevos selectores y grupos de control
+  const typeSelector = document.getElementById('watermark-type-selector');
+  const textControlsGroup = document.getElementById('text-controls-group');
+  const imageControlsGroup = document.getElementById('image-controls-group');
+  const colorControlCol = document.getElementById('color-control-col');
+  const fontSelect = document.getElementById('watermark-font');
 
   // Inputs de la marca de agua
   const textInput = document.getElementById('watermark-text');
@@ -33,12 +43,18 @@ window.addEventListener('DOMContentLoaded', () => {
   const btnDownload = document.getElementById('btn-download');
 
   let currentImage = null;
-  // Posición normalizada en porcentaje (0 a 100) respecto a la imagen visible
+  let currentLogoImage = null;
+
+  // Posiciones normalizadas en porcentaje (0 a 100) respecto a la imagen visible
   let posX = 50; 
   let posY = 50; 
+  let logoPosX = 50;
+  let logoPosY = 50;
+
+  let activeDraggable = null; // 'text' o 'logo'
   let isDragging = false;
 
-  // Botones de carga
+  // Botones de carga de foto principal
   btnCamera.addEventListener('click', () => inputCamera.click());
   btnGallery.addEventListener('click', () => inputGallery.click());
 
@@ -58,7 +74,10 @@ window.addEventListener('DOMContentLoaded', () => {
           // Posición inicial centrada
           posX = 50;
           posY = 50;
+          logoPosX = 50;
+          logoPosY = 50;
           updateWatermarkPosition();
+          updateLogoPosition();
           
           uploadBox.classList.add('hidden');
           previewContainer.classList.remove('hidden');
@@ -72,27 +91,81 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Actualizar estilos visuales de la marca de agua en tiempo real
+  // Carga de Imagen Secundaria (Logo)
+  btnUploadLogo.addEventListener('click', () => inputLogo.click());
+  inputLogo.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          currentLogoImage = img;
+          logoLayer.src = event.target.result;
+          logoLayer.classList.remove('hidden');
+          logoPosX = 50;
+          logoPosY = 50;
+          updateLogoPosition();
+          updateStyles();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // Alternar entre modo Texto e Imagen
+  typeSelector.addEventListener('change', () => {
+    if (typeSelector.value === 'text') {
+      textControlsGroup.classList.remove('hidden');
+      imageControlsGroup.classList.add('hidden');
+      colorControlCol.classList.remove('hidden');
+      watermarkLayer.classList.remove('hidden');
+      logoLayer.classList.add('hidden');
+    } else {
+      textControlsGroup.classList.add('hidden');
+      imageControlsGroup.classList.remove('hidden');
+      colorControlCol.classList.add('hidden');
+      watermarkLayer.classList.add('hidden');
+      if (currentLogoImage) {
+        logoLayer.classList.remove('hidden');
+      }
+    }
+  });
+
+  // Actualizar estilos visuales en tiempo real
   function updateStyles() {
+    const opacityVal = parseFloat(opacityInput.value);
+    const sizeVal = parseInt(sizeInput.value);
+
+    // Estilos de Texto
     const text = textInput.value || 'Leire';
     const color = colorInput.value;
-    const sizeVal = parseInt(sizeInput.value);
-    const opacityVal = parseFloat(opacityInput.value);
+    const fontFamily = fontSelect.value;
 
     watermarkLayer.textContent = text;
     watermarkLayer.style.color = color;
-    // Tamaño relativo y fluido adaptado al contenedor de la imagen
+    watermarkLayer.style.fontFamily = fontFamily;
     watermarkLayer.style.fontSize = `${sizeVal * 0.6}px`;
     watermarkLayer.style.opacity = opacityVal;
+
+    // Estilos de Logo
+    logoLayer.style.opacity = opacityVal;
+    logoLayer.style.width = `${sizeVal * 2.5}px`;
   }
 
-  // Posicionar la capa de texto en pantalla
+  // Posicionar capas en pantalla
   function updateWatermarkPosition() {
     watermarkLayer.style.left = `${posX}%`;
     watermarkLayer.style.top = `${posY}%`;
   }
 
-  // Eventos para arrastrar el texto de manera ultra fluida (Mouse y Táctil)
+  function updateLogoPosition() {
+    logoLayer.style.left = `${logoPosX}%`;
+    logoLayer.style.top = `${logoPosY}%`;
+  }
+
+  // Coordenadas de arrastre optimizadas
   function getContainerCoordinates(e) {
     const rect = previewImg.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -101,7 +174,6 @@ window.addEventListener('DOMContentLoaded', () => {
     let x = clientX - rect.left;
     let y = clientY - rect.top;
 
-    // Limitar dentro de los bordes de la imagen visible
     x = Math.max(0, Math.min(x, rect.width));
     y = Math.max(0, Math.min(y, rect.height));
 
@@ -111,8 +183,9 @@ window.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  function startDrag(e) {
+  function startDrag(targetType, e) {
     isDragging = true;
+    activeDraggable = targetType;
     moveDrag(e);
   }
 
@@ -120,28 +193,38 @@ window.addEventListener('DOMContentLoaded', () => {
     if (isDragging) {
       if (e.cancelable) e.preventDefault();
       const coords = getContainerCoordinates(e);
-      posX = coords.xPercent;
-      posY = coords.yPercent;
-      updateWatermarkPosition();
+      if (activeDraggable === 'text') {
+        posX = coords.xPercent;
+        posY = coords.yPercent;
+        updateWatermarkPosition();
+      } else if (activeDraggable === 'logo') {
+        logoPosX = coords.xPercent;
+        logoPosY = coords.yPercent;
+        updateLogoPosition();
+      }
     }
   }
 
   function stopDrag() {
     isDragging = false;
+    activeDraggable = null;
   }
 
-  // Eventos de ratón
-  watermarkLayer.addEventListener('mousedown', startDrag);
+  // Eventos de arrastre independientes (Texto / Logo)
+  watermarkLayer.addEventListener('mousedown', (e) => startDrag('text', e));
+  watermarkLayer.addEventListener('touchstart', (e) => startDrag('text', e), { passive: true });
+
+  logoLayer.addEventListener('mousedown', (e) => startDrag('logo', e));
+  logoLayer.addEventListener('touchstart', (e) => startDrag('logo', e), { passive: true });
+
   window.addEventListener('mousemove', moveDrag);
   window.addEventListener('mouseup', stopDrag);
-
-  // Eventos táctiles para celular
-  watermarkLayer.addEventListener('touchstart', startDrag, { passive: true });
   window.addEventListener('touchmove', moveDrag, { passive: false });
   window.addEventListener('touchend', stopDrag);
 
   // Eventos de controles
   textInput.addEventListener('input', updateStyles);
+  fontSelect.addEventListener('change', updateStyles);
   colorInput.addEventListener('input', updateStyles);
   sizeInput.addEventListener('input', updateStyles);
   opacityInput.addEventListener('input', updateStyles);
@@ -149,8 +232,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // Cambiar foto
   btnReset.addEventListener('click', () => {
     currentImage = null;
+    currentLogoImage = null;
     inputCamera.value = '';
     inputGallery.value = '';
+    inputLogo.value = '';
+    logoLayer.classList.add('hidden');
     previewContainer.classList.add('hidden');
     editorControls.classList.add('hidden');
     uploadBox.classList.remove('hidden');
@@ -168,30 +254,47 @@ window.addEventListener('DOMContentLoaded', () => {
     exportCtx.clearRect(0, 0, exportCanvas.width, exportCanvas.height);
     exportCtx.drawImage(currentImage, 0, 0);
 
-    // 2. Calcular posición exacta proporcional en la imagen real
-    const finalX = (posX / 100) * exportCanvas.width;
-    const finalY = (posY / 100) * exportCanvas.height;
-
-    // 3. Calcular tamaño de fuente proporcional a la resolución de la foto
-    const baseSize = parseInt(sizeInput.value);
-    const scaledFontSize = baseSize * (exportCanvas.width / 500);
-
-    const text = textInput.value || 'Leire';
     const opacity = parseFloat(opacityInput.value);
-    const color = colorInput.value;
+    const sizeVal = parseInt(sizeInput.value);
 
     exportCtx.save();
     exportCtx.globalAlpha = opacity;
-    exportCtx.font = `bold ${scaledFontSize}px sans-serif`;
-    exportCtx.fillStyle = color;
-    exportCtx.textAlign = 'center';
-    exportCtx.textBaseline = 'middle';
 
-    // Sombra para legibilidad en la foto descargada
-    exportCtx.shadowColor = 'rgba(0,0,0,0.6)';
-    exportCtx.shadowBlur = Math.round(scaledFontSize * 0.15);
+    if (typeSelector.value === 'text') {
+      // Dibujar Marca de Agua de Texto
+      const finalX = (posX / 100) * exportCanvas.width;
+      const finalY = (posY / 100) * exportCanvas.height;
+      const scaledFontSize = sizeVal * (exportCanvas.width / 400);
 
-    exportCtx.fillText(text, finalX, finalY);
+      const text = textInput.value || 'Leire';
+      const color = colorInput.value;
+      const fontFamily = fontSelect.value;
+
+      exportCtx.font = `bold ${scaledFontSize}px ${fontFamily}`;
+      exportCtx.fillStyle = color;
+      exportCtx.textAlign = 'center';
+      exportCtx.textBaseline = 'middle';
+
+      // Sombra para legibilidad en la foto descargada
+      exportCtx.shadowColor = 'rgba(0,0,0,0.6)';
+      exportCtx.shadowBlur = Math.round(scaledFontSize * 0.15);
+
+      exportCtx.fillText(text, finalX, finalY);
+
+    } else if (typeSelector.value === 'image' && currentLogoImage) {
+      // Dibujar Marca de Agua de Imagen / Logo
+      const logoW = currentLogoImage.width;
+      const logoH = currentLogoImage.height;
+      
+      const targetLogoWidth = (sizeVal / 100) * exportCanvas.width * 0.8;
+      const targetLogoHeight = (logoH * targetLogoWidth) / logoW;
+
+      const finalLogoX = (logoPosX / 100) * exportCanvas.width - (targetLogoWidth / 2);
+      const finalLogoY = (logoPosY / 100) * exportCanvas.height - (targetLogoHeight / 2);
+
+      exportCtx.drawImage(currentLogoImage, finalLogoX, finalLogoY, targetLogoWidth, targetLogoHeight);
+    }
+
     exportCtx.restore();
 
     // 4. Exportar el resultado final limpio y rápido
