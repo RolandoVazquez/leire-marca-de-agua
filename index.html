@@ -29,6 +29,8 @@
       <!-- Inputs ocultos para archivos -->
       <input type="file" id="input-gallery" accept="image/*" style="display: none;">
       <input type="file" id="input-camera" accept="image/*" capture="environment" style="display: none;">
+      <!-- Input oculto para cargar la imagen secundaria (Logo) -->
+      <input type="file" id="input-logo" accept="image/*" style="display: none;">
 
       <!-- Area de Vista Previa optimizada con Capas DOM -->
       <div class="editor-stage">
@@ -53,7 +55,12 @@
         <!-- Contenedor de Capas para arrastre ultra fluido -->
         <div id="preview-container" class="hidden" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none;">
           <img id="preview-img" style="max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none; user-select: none;" alt="Preview">
+          
+          <!-- Capa de Texto -->
           <div id="watermark-layer" style="position: absolute; cursor: grab; user-select: none; font-weight: bold; text-shadow: 0px 0px 6px rgba(0,0,0,0.6); white-space: nowrap; transform: translate(-50%, -50%);">Leire</div>
+          
+          <!-- Capa de Imagen / Logo secundario (inicialmente oculta) -->
+          <img id="logo-layer" class="hidden" style="position: absolute; cursor: grab; user-select: none; max-width: 150px; max-height: 150px; transform: translate(-50%, -50%);" alt="Logo Marca">
         </div>
 
         <!-- Canvas oculto para procesar la imagen final al descargar -->
@@ -63,13 +70,46 @@
       <!-- Panel de Controles de Edición -->
       <div id="editor-controls" class="controls-panel hidden">
         
+        <!-- Selector de Tipo de Marca de Agua -->
         <div class="control-row">
-          <label>Texto:</label>
-          <input type="text" id="watermark-text" value="Leire" placeholder="Escribe tu marca...">
+          <label>Tipo de Marca:</label>
+          <select id="watermark-type-selector" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 14px;">
+            <option value="text">✍️ Texto Personalizado</option>
+            <option value="image">🏷️ Imagen / Logotipo</option>
+          </select>
+        </div>
+
+        <!-- Controles exclusivos para Texto -->
+        <div id="text-controls-group">
+          <div class="control-row">
+            <label>Texto:</label>
+            <input type="text" id="watermark-text" value="Leire" placeholder="Escribe tu marca...">
+          </div>
+
+          <div class="control-row">
+            <label>Tipografía:</label>
+            <select id="watermark-font" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ccc; background: #fff; font-size: 14px;">
+              <option value="sans-serif">Moderna (Sans-Serif)</option>
+              <option value="serif">Elegante (Serif)</option>
+              <option value="monospace">Técnica (Monospace)</option>
+              <option value="'Courier New', Courier, monospace">Courier Clásica</option>
+              <option value="'Georgia', serif">Georgia Estilizada</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Controles exclusivos para Imagen / Logo -->
+        <div id="image-controls-group" class="hidden">
+          <div class="control-row">
+            <label>Logotipo:</label>
+            <button type="button" id="btn-upload-logo" class="btn btn-secondary" style="width: 100%; font-size: 13px; padding: 8px;">
+              📂 Seleccionar Imagen de Logo
+            </button>
+          </div>
         </div>
 
         <div class="control-grid">
-          <div class="control-col">
+          <div class="control-col" id="color-control-col">
             <label>Color:</label>
             <input type="color" id="watermark-color" value="#ffffff">
           </div>
