@@ -209,7 +209,7 @@ window.addEventListener('DOMContentLoaded', () => {
     logoLayerVideo.style.top = `${logoPosY}%`;
   }
 
-  // --- SOLUCIÓN DE ARRASTRE LIBRE Y FLUIDO SOBRE VIDEO ---
+  // --- ARRASTRE FLUIDO E INDEPENDIENTE SOBRE EL CONTENEDOR DE VIDEO ---
   function getContainerCoordinates(e) {
     const activeContainerElement = isVideoMode ? videoPreviewContainer : previewImg;
     const rect = activeContainerElement.getBoundingClientRect();
@@ -255,10 +255,7 @@ window.addEventListener('DOMContentLoaded', () => {
     activeDraggable = null;
   }
 
-  // Habilitamos eventos de puntero directos que funcionan perfecto por encima de los videos en Chrome
-  watermarkLayerVideo.style.pointerEvents = 'auto';
-  logoLayerVideo.style.pointerEvents = 'auto';
-
+  // Asignamos eventos directos y puros para que el texto/logo floten sin interferir con el video
   watermarkLayer.addEventListener('pointerdown', (e) => startDrag('text', e));
   watermarkLayerVideo.addEventListener('pointerdown', (e) => startDrag('text', e));
 
@@ -293,7 +290,7 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // --- DESCARGA OPTIMIZADA SIN CÁMARA LENTA ---
+  // --- DESCARGA OPTIMIZADA: EL VIDEO ORIGINAL QUEDA INTACTO Y SE COMPILA AL FINAL ---
   btnDownload.addEventListener('click', () => {
     if (isVideoMode && currentVideoFile) {
       btnDownload.textContent = '⏳ Procesando Video...';
@@ -310,7 +307,6 @@ window.addEventListener('DOMContentLoaded', () => {
         exportVideoCanvas.height = vidElement.videoHeight;
         const ctx = exportVideoCanvas.getContext('2d');
 
-        // Forzamos tasa de bits alta y sin restricciones de lentitud para conservar la calidad intacta
         const stream = exportVideoCanvas.captureStream();
         let recordedChunks = [];
         let mediaRecorder;
@@ -318,7 +314,7 @@ window.addEventListener('DOMContentLoaded', () => {
         try {
           mediaRecorder = new MediaRecorder(stream, { 
             mimeType: 'video/webm; codecs=vp9',
-            videoBitsPerSecond: 8000000 // Alta calidad de video nítido
+            videoBitsPerSecond: 10000000 // Calidad máxima intacta
           });
         } catch (err) {
           mediaRecorder = new MediaRecorder(stream);
@@ -353,9 +349,11 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
+          // 1. Dibuja el fotograma limpio del video original
           ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
           ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
 
+          // 2. Superpone la marca de agua exactamente en la posición donde la dejaste configurada
           const opacity = parseFloat(opacityInput.value);
           const sizeVal = parseInt(sizeInput.value);
 
@@ -406,6 +404,7 @@ window.addEventListener('DOMContentLoaded', () => {
       };
 
     } else if (currentImage) {
+      // Tu lógica intacta de imágenes
       exportCanvas.width = currentImage.width;
       exportCanvas.height = currentImage.height;
 
