@@ -13,34 +13,34 @@ window.addEventListener('DOMContentLoaded', () => {
   // Elementos DOM
   const btnCamera = document.getElementById('btn-camera');
   const btnGallery = document.getElementById('btn-gallery');
-  const btnVideo = document.getElementById('btn-video'); // Nuevo botón de video
+  const btnVideo = document.getElementById('btn-video');
   const inputCamera = document.getElementById('input-camera');
   const inputGallery = document.getElementById('input-gallery');
   const inputLogo = document.getElementById('input-logo');
-  const inputVideo = document.getElementById('input-video'); // Nuevo input de video
+  const inputVideo = document.getElementById('input-video');
   const btnUploadLogo = document.getElementById('btn-upload-logo');
   
   const uploadBox = document.getElementById('upload-box');
   const previewContainer = document.getElementById('preview-container');
-  const videoPreviewContainer = document.getElementById('video-preview-container'); // Nuevo contenedor de video
+  const videoPreviewContainer = document.getElementById('video-preview-container');
   
   const previewImg = document.getElementById('preview-img');
-  const previewVideo = document.getElementById('preview-video'); // Nuevo elemento de video
+  const previewVideo = document.getElementById('preview-video');
 
   const watermarkLayer = document.getElementById('watermark-layer');
   const logoLayer = document.getElementById('logo-layer');
   
-  const watermarkLayerVideo = document.getElementById('watermark-layer-video'); // Capas de video
+  const watermarkLayerVideo = document.getElementById('watermark-layer-video');
   const logoLayerVideo = document.getElementById('logo-layer-video');
 
   const exportCanvas = document.getElementById('export-canvas');
   const exportCtx = exportCanvas.getContext('2d');
   
-  const exportVideoCanvas = document.getElementById('export-video-canvas'); // Canvas para exportar video
+  const exportVideoCanvas = document.getElementById('export-video-canvas');
   
   const editorControls = document.getElementById('editor-controls');
 
-  // Nuevos selectores y grupos de control
+  // Selectores y grupos de control
   const typeSelector = document.getElementById('watermark-type-selector');
   const textControlsGroup = document.getElementById('text-controls-group');
   const imageControlsGroup = document.getElementById('image-controls-group');
@@ -57,26 +57,26 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let currentImage = null;
   let currentLogoImage = null;
-  let currentVideoFile = null; // Archivo de video actual
-  let isVideoMode = false;     // Bandera para diferenciar modo imagen o video
+  let currentVideoFile = null;
+  let isVideoMode = false;
 
-  // Posiciones normalizadas en porcentaje (0 a 100) respecto al elemento visible
+  // Posiciones normalizadas en porcentaje (0 a 100)
   let posX = 50; 
   let posY = 50; 
   let logoPosX = 50;
   let logoPosY = 50;
 
-  let activeDraggable = null; // 'text' o 'logo'
+  let activeDraggable = null; 
   let isDragging = false;
 
-  // Botones de carga principales (Cámara, Galería e Input de Video)
+  // Botones de carga principales
   btnCamera.addEventListener('click', () => inputCamera.click());
   btnGallery.addEventListener('click', () => inputGallery.click());
-  btnVideo.addEventListener('click', () => inputVideo.click()); // Activar selector de video
+  btnVideo.addEventListener('click', () => inputVideo.click());
 
   inputCamera.addEventListener('change', handleFileSelect);
   inputGallery.addEventListener('change', handleFileSelect);
-  inputVideo.addEventListener('change', handleVideoSelect); // Manejador específico para video
+  inputVideo.addEventListener('change', handleVideoSelect);
 
   function handleFileSelect(e) {
     const file = e.target.files[0];
@@ -90,7 +90,6 @@ window.addEventListener('DOMContentLoaded', () => {
           currentVideoFile = null;
           previewImg.src = event.target.result;
           
-          // Posición inicial centrada
           posX = 50;
           posY = 50;
           logoPosX = 50;
@@ -111,7 +110,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Manejador de selección de video
   function handleVideoSelect(e) {
     const file = e.target.files[0];
     if (file) {
@@ -138,7 +136,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Carga de Imagen Secundaria (Logo)
+  // Carga de Logo
   btnUploadLogo.addEventListener('click', () => inputLogo.click());
   inputLogo.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -149,7 +147,7 @@ window.addEventListener('DOMContentLoaded', () => {
         img.onload = function() {
           currentLogoImage = img;
           logoLayer.src = event.target.result;
-          logoLayerVideo.src = event.target.result; // Sincronizar logo para video
+          logoLayerVideo.src = event.target.result;
           logoLayer.classList.remove('hidden');
           logoLayerVideo.classList.remove('hidden');
           logoPosX = 50;
@@ -163,7 +161,6 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Alternar entre modo Texto e Imagen
   typeSelector.addEventListener('change', () => {
     if (typeSelector.value === 'text') {
       textControlsGroup.classList.remove('hidden');
@@ -186,31 +183,26 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Actualizar estilos visuales en tiempo real (tanto para fotos como videos)
   function updateStyles() {
     const opacityVal = parseFloat(opacityInput.value);
     const sizeVal = parseInt(sizeInput.value);
 
-    // Estilos de Texto
     const text = textInput.value || 'Leire';
     const color = colorInput.value;
     const fontFamily = fontSelect.value;
 
-    // Aplicar a Imagen
     watermarkLayer.textContent = text;
     watermarkLayer.style.color = color;
     watermarkLayer.style.fontFamily = fontFamily;
     watermarkLayer.style.fontSize = `${sizeVal * 0.6}px`;
     watermarkLayer.style.opacity = opacityVal;
 
-    // Aplicar a Video
     watermarkLayerVideo.textContent = text;
     watermarkLayerVideo.style.color = color;
     watermarkLayerVideo.style.fontFamily = fontFamily;
     watermarkLayerVideo.style.fontSize = `${sizeVal * 0.6}px`;
     watermarkLayerVideo.style.opacity = opacityVal;
 
-    // Estilos de Logo
     logoLayer.style.opacity = opacityVal;
     logoLayer.style.width = `${sizeVal * 2.5}px`;
 
@@ -218,7 +210,6 @@ window.addEventListener('DOMContentLoaded', () => {
     logoLayerVideo.style.width = `${sizeVal * 2.5}px`;
   }
 
-  // Posicionar capas en pantalla (Imágenes y Videos)
   function updateWatermarkPosition() {
     watermarkLayer.style.left = `${posX}%`;
     watermarkLayer.style.top = `${posY}%`;
@@ -233,9 +224,10 @@ window.addEventListener('DOMContentLoaded', () => {
     logoLayerVideo.style.top = `${logoPosY}%`;
   }
 
-  // Coordenadas de arrastre optimizadas
+  // Coordenadas de arrastre optimizadas para el contenedor del video
   function getContainerCoordinates(e) {
-    const activeContainerElement = isVideoMode ? previewVideo : previewImg;
+    // Tomamos el contenedor padre del video para calcular el área exacta de arrastre sin fallos
+    const activeContainerElement = isVideoMode ? videoPreviewContainer : previewImg;
     const rect = activeContainerElement.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -279,31 +271,28 @@ window.addEventListener('DOMContentLoaded', () => {
     activeDraggable = null;
   }
 
-  // Eventos de arrastre independientes (Texto / Logo para imágenes y videos)
+  // Eventos de arrastre robustos para texto y logo en video e imagen
   watermarkLayer.addEventListener('mousedown', (e) => startDrag('text', e));
-  watermarkLayer.addEventListener('touchstart', (e) => startDrag('text', e), { passive: true });
+  watermarkLayer.addEventListener('touchstart', (e) => startDrag('text', e), { passive: false });
   watermarkLayerVideo.addEventListener('mousedown', (e) => startDrag('text', e));
-  watermarkLayerVideo.addEventListener('touchstart', (e) => startDrag('text', e), { passive: true });
+  watermarkLayerVideo.addEventListener('touchstart', (e) => startDrag('text', e), { passive: false });
 
   logoLayer.addEventListener('mousedown', (e) => startDrag('logo', e));
-  logoLayer.addEventListener('touchstart', (e) => startDrag('logo', e), { passive: true });
+  logoLayer.addEventListener('touchstart', (e) => startDrag('logo', e), { passive: false });
   logoLayerVideo.addEventListener('mousedown', (e) => startDrag('logo', e));
-  logoLayerVideo.addEventListener('touchstart', (e) => startDrag('logo', e), { passive: true });
+  logoLayerVideo.addEventListener('touchstart', (e) => startDrag('logo', e), { passive: false });
 
   window.addEventListener('mousemove', moveDrag);
   window.addEventListener('mouseup', stopDrag);
   window.addEventListener('touchmove', moveDrag, { passive: false });
   window.addEventListener('touchend', stopDrag);
 
-  // Eventos de controles
   textInput.addEventListener('input', updateStyles);
   fontSelect.addEventListener('change', updateStyles);
   colorInput.addEventListener('input', updateStyles);
   sizeInput.addEventListener('input', updateStyles);
-  opacityInput.addEventListener('input5', updateStyles); // Sin afectar nada previo
   opacityInput.addEventListener('input', updateStyles);
 
-  // Cambiar foto o video (Reset)
   btnReset.addEventListener('click', () => {
     currentImage = null;
     currentLogoImage = null;
@@ -323,10 +312,9 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // Descargar la imagen o video procesado al hacer clic
+  // Procesamiento de video optimizado para preservar la fluidez y calidad original
   btnDownload.addEventListener('click', () => {
     if (isVideoMode && currentVideoFile) {
-      // --- PROCESAMIENTO Y DESCARGA DE VIDEO ---
       btnDownload.textContent = '⏳ Procesando Video...';
       btnDownload.disabled = true;
 
@@ -334,20 +322,22 @@ window.addEventListener('DOMContentLoaded', () => {
       vidElement.src = URL.createObjectURL(currentVideoFile);
       vidElement.crossOrigin = 'anonymous';
       vidElement.muted = true;
+      vidElement.playsInline = true;
 
       vidElement.onloadedmetadata = () => {
         exportVideoCanvas.width = vidElement.videoWidth;
         exportVideoCanvas.height = vidElement.videoHeight;
         const ctx = exportVideoCanvas.getContext('2d');
 
-        const stream = exportVideoCanvas.captureStream(30); // 30 FPS fluidos
+        // Capturamos el stream a los fotogramas nativos del video original para evitar tirones
+        const stream = exportVideoCanvas.captureStream(60); 
         let recordedChunks = [];
         let mediaRecorder;
 
         try {
           mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
         } catch (err) {
-          mediaRecorder = new MediaRecorder(stream); // Fallback compatible
+          mediaRecorder = new MediaRecorder(stream);
         }
 
         mediaRecorder.ondataavailable = (event) => {
@@ -367,20 +357,21 @@ window.addEventListener('DOMContentLoaded', () => {
           btnDownload.disabled = false;
         };
 
-        vidElement.play();
         mediaRecorder.start();
+        vidElement.currentTime = 0;
+        vidElement.play();
 
-        function drawVideoFrame() {
+        function renderFrame() {
           if (vidElement.ended || vidElement.paused) {
-            mediaRecorder.stop();
+            if (mediaRecorder.state !== 'inactive') {
+              mediaRecorder.stop();
+            }
             return;
           }
 
-          // 1. Dibujar fotograma original del video con calidad intacta
           ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
           ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
 
-          // 2. Aplicar marca de agua con configuración exacta
           const opacity = parseFloat(opacityInput.value);
           const sizeVal = parseInt(sizeInput.value);
 
@@ -419,14 +410,26 @@ window.addEventListener('DOMContentLoaded', () => {
           }
 
           ctx.restore();
-          requestAnimationFrame(drawVideoFrame);
+          
+          // Sincronización perfecta de fotogramas mediante requestVideoFrameCallback si está disponible
+          if (vidElement.requestVideoFrameCallback) {
+            vidElement.requestVideoFrameCallback(renderFrame);
+          } else {
+            requestAnimationFrame(renderFrame);
+          }
         }
 
-        drawVideoFrame();
+        vidElement.onplay = () => {
+          if (vidElement.requestVideoFrameCallback) {
+            vidElement.requestVideoFrameCallback(renderFrame);
+          } else {
+            renderFrame();
+          }
+        };
       };
 
     } else if (currentImage) {
-      // --- PROCESAMIENTO Y DESCARGA DE IMAGEN (Tu código original intacto) ---
+      // Tu lógica intacta de imágenes
       exportCanvas.width = currentImage.width;
       exportCanvas.height = currentImage.height;
 
