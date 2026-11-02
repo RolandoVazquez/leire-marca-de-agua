@@ -35,7 +35,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const exportCanvas = document.getElementById('export-canvas');
   const exportCtx = exportCanvas.getContext('2d');
-  const exportVideoCanvas = document.getElementById('export-video-canvas');
   
   const editorControls = document.getElementById('editor-controls');
 
@@ -289,155 +288,98 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // --- DESCARGA NATIVA ESTABLE Y A VELOCIDAD REAL (1.0x) SIN CÁMARA LENTA ---
-  btnDownload.addEventListener('click', () => {
+  // --- DESCARGA DE VIDEO CON FFmpeg.wasm (FLUIDA, SIN CÁMARA LENTA Y RESPETANDO ARRASTRE LIBRE) ---
+  btnDownload.addEventListener('click', async () => {
     if (isVideoMode && currentVideoFile) {
-      btnDownload.textContent = '⏳ Procesando Video...';
+      btnDownload.textContent = '⏳ Iniciando FFmpeg...';
       btnDownload.disabled = true;
 
-      const vidElement = document.createElement('video');
-      vidElement.src = URL.createObjectURL(currentVideoFile);
-      vidElement.crossOrigin = 'anonymous';
-      vidElement.muted = true;
-      vidElement.playsInline = true;
+      try {
+        const { FFmpeg } = FFmpegWASM;
+        const ffmpeg = new FFmpeg();
 
-      vidElement.onloadedmetadata = () => {
-        // Corrección inteligente de orientación: Respeta la proporción visual real del video
-        let w = vidElement.videoWidth;
-        let h = vidElement.videoHeight;
-        
-        // Si el video visualmente es horizontal pero los metadatos vienen invertidos
-        if (vidElement.videoWidth < vidElement.videoHeight && vidElement.style.width > vidElement.style.height) {
-          w = vidElement.videoHeight;
-          h = vidElement.videoWidth;
+        if (!ffmpeg.loaded) {
+          btnDownload.textContent = '⏳ Cargando Motor Video...';
+          await ffmpeg.load({
+            coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+            wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+          });
         }
 
-        exportVideoCanvas.width = w;
-        exportVideoCanvas.height = h;
-        const ctx = exportVideoCanvas.getContext('2d', { alpha: false });
+        btnDownload.textContent = '⏳ Procesando Video...';
 
-        // Captura fija a 30 FPS estables para garantizar sincronía exacta en la reproducción
-        let stream = exportVideoCanvas.captureStream(30);
-        let recordedChunks = [];
-        let mediaRecorder;
+        const videoData = new Uint8Array(await currentVideoFile.arrayBuffer());
+        await ffmpeg.writeFile('input.mp4', videoData);
 
-        const mimeTypes = ['video/webm; codecs=vp9,opus', 'video/webm; codecs=vp8', 'video/webm'];
-        let selectedMimeType = '';
-        for (let type of mimeTypes) {
-          if (type === '' || MediaRecorder.isTypeSupported(type)) {
-            selectedMimeType = type;
-            break;
-          }
+        let filterArgs = '';
+        let extraInputs = '';
+
+        const opacity = parseFloat(opacityInput.value);
+        const sizeVal = parseInt(sizeInput.value);
+
+        if (typeSelector.value === 'text') {
+          const text = textInput.value || 'Leire';
+          const colorHex = colorInput.value.replace('#', '');
+          const r = parseInt(colorHex.substring(0, 2), 16);
+          const g = parseInt(colorHex.substring(2, 4), 16);
+          const b = parseInt(colorHex.substring(4, 6), 16);
+          const fontColor = `r=${r}:g=${g}:b=${b}:alpha=${opacity}`;
+          const fontSize = Math.round(sizeVal * 1.2);
+
+          // Posición calculada exactamente desde el porcentaje donde el usuario arrastró el texto
+          const xExpr = `(w-tw)*(${posX}/100)`;
+          const yExpr = `(h-th)*(${posY}/100)`;
+
+          filterArgs = `drawtext=text='${text}':x=${xExpr}:y=${yExpr}:fontsize=${fontSize}:fontcolor_expr=${fontColor}:shadowx=2:shadowy=2:shadowcolor=black@0.6`;
+        } else if (typeSelector.value === 'image' && currentLogoImage) {
+          const logoBuffer = new Uint8Array(await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (evt) => resolve(evt.target.result);
+            reader.readAsArrayBuffer(inputLogo.files[0]);
+          }));
+
+          await ffmpeg.writeFile('logo.png', logoBuffer);
+          extraInputs = '-i logo.png';
+
+          const scaleVal = Math.round(sizeVal * 4);
+          // Posición exacta según el porcentaje donde el usuario soltó el logotipo
+          const xExpr = `(W-w)*(${logoPosX}/100)`;
+          const yExpr = `(H-h)*(${logoPosY}/100)`;
+
+          filterArgs = `[1:v]scale=${scaleVal}:-1,format=rgba,colorchannelmixer=aa=${opacity}[logo];[0:v][logo]overlay=${xExpr}:${yExpr}`;
+        } else {
+          filterArgs = 'null';
         }
 
-        try {
-          mediaRecorder = selectedMimeType ? 
-            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 8000000 }) : 
-            new MediaRecorder(stream);
-        } catch (err) {
-          mediaRecorder = new MediaRecorder(stream);
-        }
+        const args = ['-i', 'input.mp4'];
+        if (extraInputs) args.push('-i', 'logo.png');
+        args.push(
+          '-filter_complex', filterArgs,
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-crf', '23',
+          '-c:a', 'copy',
+          'output.mp4'
+        );
 
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) recordedChunks.push(event.data);
-        };
+        await ffmpeg.exec(args);
 
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.download = `Leire-marca-de-agua-${Date.now()}.webm`;
-          link.href = url;
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        const data = await ffmpeg.readFile('output.mp4');
+        const blob = new Blob([data.buffer], { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `Leire-marca-de-agua-${Date.now()}.mp4`;
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-          btnDownload.textContent = '⬇️ Descargar Archivo';
-          btnDownload.disabled = false;
-        };
-
-        mediaRecorder.start(100);
-        vidElement.currentTime = 0;
-        vidElement.playbackRate = 1.0; 
-
-        vidElement.play().catch(err => {
-          console.error("Error al reproducir video:", err);
-          btnDownload.textContent = '⬇️ Descargar Archivo';
-          btnDownload.disabled = false;
-        });
-
-        // Bucle de sincronización exacto a 30 FPS para evitar efecto de cámara lenta
-        const fps = 30;
-        const interval = 1000 / fps;
-        let lastTime = performance.now();
-
-        function renderExportFrame(now) {
-          if (vidElement.ended || vidElement.paused) {
-            setTimeout(() => {
-              if (mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-              }
-            }, 300);
-            return;
-          }
-
-          const elapsed = now - lastTime;
-          if (elapsed >= interval) {
-            lastTime = now - (elapsed % interval);
-
-            // 1. Dibujar fotograma original limpio de fondo a resolución exacta
-            ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
-            ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
-
-            // 2. Superponer marca de agua en su posición configurada
-            const opacity = parseFloat(opacityInput.value);
-            const sizeVal = parseInt(sizeInput.value);
-
-            ctx.save();
-            ctx.globalAlpha = opacity;
-
-            if (typeSelector.value === 'text') {
-              const finalX = (posX / 100) * exportVideoCanvas.width;
-              const finalY = (posY / 100) * exportVideoCanvas.height;
-              const scaledFontSize = sizeVal * (exportVideoCanvas.width / 400);
-
-              const text = textInput.value || 'Leire';
-              const color = colorInput.value;
-              const fontFamily = fontSelect.value;
-
-              ctx.font = `bold ${scaledFontSize}px ${fontFamily}`;
-              ctx.fillStyle = color;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.shadowColor = 'rgba(0,0,0,0.6)';
-              ctx.shadowBlur = Math.round(scaledFontSize * 0.15);
-
-              ctx.fillText(text, finalX, finalY);
-
-            } else if (typeSelector.value === 'image' && currentLogoImage) {
-              const logoW = currentLogoImage.width;
-              const logoH = currentLogoImage.height;
-              
-              const targetLogoWidth = (sizeVal / 100) * exportVideoCanvas.width * 0.8;
-              const targetLogoHeight = (logoH * targetLogoWidth) / logoW;
-
-              const finalLogoX = (logoPosX / 100) * exportVideoCanvas.width - (targetLogoWidth / 2);
-              const finalLogoY = (logoPosY / 100) * exportVideoCanvas.height - (targetLogoHeight / 2);
-
-              ctx.drawImage(currentLogoImage, finalLogoX, finalLogoY, targetLogoWidth, targetLogoHeight);
-            }
-
-            ctx.restore();
-          }
-
-          if (!vidElement.paused && !vidElement.ended) {
-            requestAnimationFrame(renderExportFrame);
-          }
-        }
-
-        vidElement.onplay = () => {
-          requestAnimationFrame(renderExportFrame);
-        };
-      };
+      } catch (err) {
+        console.error("Error al procesar video con FFmpeg:", err);
+        alert("Hubo un error al procesar el video. Inténtalo de nuevo.");
+      } finally {
+        btnDownload.textContent = '⬇️ Descargar Archivo';
+        btnDownload.disabled = false;
+      }
 
     } else if (currentImage) {
       exportCanvas.width = currentImage.width;
