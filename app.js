@@ -35,7 +35,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const exportCanvas = document.getElementById('export-canvas');
   const exportCtx = exportCanvas.getContext('2d');
-  const exportVideoCanvas = document.getElementById('export-video-canvas');
   
   const editorControls = document.getElementById('editor-controls');
 
@@ -289,134 +288,81 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // --- DESCARGA LOCAL OPTIMIZADA PARA MÁXIMA VELOCIDAD Y FLUIDEZ NORMAL ---
-  btnDownload.addEventListener('click', () => {
+  // --- DESCARGA LOCAL PROFESIONAL CON FFPEG.WASM (FLUIDEZ Y CALIDAD 100% ORIGINALES) ---
+  btnDownload.addEventListener('click', async () => {
     if (isVideoMode && currentVideoFile) {
-      btnDownload.textContent = '⏳ Procesando Video...';
+      btnDownload.textContent = '⏳ Renderizando Video HD...';
       btnDownload.disabled = true;
 
-      const vidElement = document.createElement('video');
-      vidElement.src = URL.createObjectURL(currentVideoFile);
-      vidElement.crossOrigin = 'anonymous';
-      vidElement.muted = true;
-      vidElement.playsInline = true;
+      try {
+        const { FFmpeg } = FFmpegWASM;
+        const ffmpeg = new FFmpeg();
 
-      vidElement.onloadedmetadata = () => {
-        // Configuramos el canvas de video con alpha: false para acelerar el rendimiento del celular al máximo
-        exportVideoCanvas.width = vidElement.videoWidth;
-        exportVideoCanvas.height = vidElement.videoHeight;
-        const ctx = exportVideoCanvas.getContext('2d', { alpha: false });
-
-        let stream = exportVideoCanvas.captureStream(30);
-        let recordedChunks = [];
-        let mediaRecorder;
-
-        const mimeTypes = ['video/webm; codecs=vp9', 'video/webm; codecs=vp8', 'video/webm', ''];
-        let selectedMimeType = '';
-        for (let type of mimeTypes) {
-          if (type === '' || MediaRecorder.isTypeSupported(type)) {
-            selectedMimeType = type;
-            break;
-          }
+        if (!ffmpeg.loaded) {
+          await ffmpeg.load({
+            coreURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+            wasmURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm",
+          });
         }
 
-        try {
-          mediaRecorder = selectedMimeType ? 
-            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 5000000 }) : 
-            new MediaRecorder(stream);
-        } catch (err) {
-          mediaRecorder = new MediaRecorder(stream);
+        const videoData = new Uint8Array(await currentVideoFile.arrayBuffer());
+        await ffmpeg.writeFile('input.mp4', videoData);
+
+        let filterString = '';
+        const opacity = parseFloat(opacityInput.value);
+        const sizeVal = parseInt(sizeInput.value);
+
+        if (typeSelector.value === 'text') {
+          const text = textInput.value || 'Leire';
+          const color = colorInput.value.replace('#', '0x');
+          const fontSize = Math.round(sizeVal * 1.5);
+
+          const xExpr = `(w*${posX}/100)-(text_w/2)`;
+          const yExpr = `(h*${posY}/100)-(text_h/2)`;
+
+          filterString = `drawtext=text='${text}':x=${xExpr}:y=${yExpr}:fontsize=${fontSize}:fontcolor=${color}@${opacity}:shadowx=2:shadowy=2:shadowcolor=black@0.6`;
+
+        } else if (typeSelector.value === 'image' && currentLogoImage) {
+          const logoData = new Uint8Array(await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (evt) => resolve(evt.target.result);
+            reader.readAsArrayBuffer(inputLogo.files[0]);
+          }));
+          await ffmpeg.writeFile('logo.png', logoData);
+
+          const scaleW = Math.round(sizeVal * 3);
+          const xExpr = `(W*${logoPosX}/100)-(w/2)`;
+          const yExpr = `(H*${logoPosY}/100)-(h/2)`;
+
+          filterString = `[1:v]scale=${scaleW}:-1,format=rgba,colorchannelmixer=aa=${opacity}[logo];[0:v][logo]overlay=${xExpr}:${yExpr}`;
         }
 
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) recordedChunks.push(event.data);
-        };
+        const args = typeSelector.value === 'image' 
+          ? ['-i', 'input.mp4', '-i', 'logo.png', '-filter_complex', filterString, '-codec:a', 'copy', 'output.mp4']
+          : ['-i', 'input.mp4', '-vf', filterString, '-codec:a', 'copy', 'output.mp4'];
 
-        mediaRecorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: 'video/webm' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.download = `Leire-marca-de-agua-${Date.now()}.webm`;
-          link.href = url;
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        await ffmpeg.exec(args);
 
-          btnDownload.textContent = '⬇️ Descargar Archivo';
-          btnDownload.disabled = false;
-        };
+        const data = await ffmpeg.readFile('output.mp4');
+        const blob = new Blob([data.buffer], { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.download = `Leire-marca-de-agua-${Date.now()}.mp4`;
+        link.href = url;
+        link.click();
+        
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-        mediaRecorder.start(100);
-        vidElement.currentTime = 0;
-        vidElement.playbackRate = 1.0; // Velocidad normal idéntica al original
-        vidElement.play().catch(err => {
-          console.error("Error al reproducir video:", err);
-          btnDownload.textContent = '⬇️ Descargar Archivo';
-          btnDownload.disabled = false;
-        });
+        btnDownload.textContent = '⬇️ Descargar Archivo';
+        btnDownload.disabled = false;
 
-        function renderExportFrame() {
-          if (vidElement.ended || vidElement.paused) {
-            setTimeout(() => {
-              if (mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-              }
-            }, 300);
-            return;
-          }
-
-          // Dibuja el fotograma limpio del video original
-          ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
-          ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
-
-          // Superpone la marca de agua exactamente en la posición configurada
-          const opacity = parseFloat(opacityInput.value);
-          const sizeVal = parseInt(sizeInput.value);
-
-          ctx.save();
-          ctx.globalAlpha = opacity;
-
-          if (typeSelector.value === 'text') {
-            const finalX = (posX / 100) * exportVideoCanvas.width;
-            const finalY = (posY / 100) * exportVideoCanvas.height;
-            const scaledFontSize = sizeVal * (exportVideoCanvas.width / 400);
-
-            const text = textInput.value || 'Leire';
-            const color = colorInput.value;
-            const fontFamily = fontSelect.value;
-
-            ctx.font = `bold ${scaledFontSize}px ${fontFamily}`;
-            ctx.fillStyle = color;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            ctx.shadowBlur = Math.round(scaledFontSize * 0.15);
-
-            ctx.fillText(text, finalX, finalY);
-
-          } else if (typeSelector.value === 'image' && currentLogoImage) {
-            const logoW = currentLogoImage.width;
-            const logoH = currentLogoImage.height;
-            
-            const targetLogoWidth = (sizeVal / 100) * exportVideoCanvas.width * 0.8;
-            const targetLogoHeight = (logoH * targetLogoWidth) / logoW;
-
-            const finalLogoX = (logoPosX / 100) * exportVideoCanvas.width - (targetLogoWidth / 2);
-            const finalLogoY = (logoPosY / 100) * exportVideoCanvas.height - (targetLogoHeight / 2);
-
-            ctx.drawImage(currentLogoImage, finalLogoX, finalLogoY, targetLogoWidth, targetLogoHeight);
-          }
-
-          ctx.restore();
-          
-          if (!vidElement.paused && !vidElement.ended) {
-            requestAnimationFrame(renderExportFrame);
-          }
-        }
-
-        vidElement.onplay = () => {
-          renderExportFrame();
-        };
-      };
+      } catch (error) {
+        console.error("Error al procesar video con FFmpeg:", error);
+        alert("Hubo un error al procesar el video. Intenta con un archivo más corto o ligero.");
+        btnDownload.textContent = '⬇️ Descargar Archivo';
+        btnDownload.disabled = false;
+      }
 
     } else if (currentImage) {
       exportCanvas.width = currentImage.width;
