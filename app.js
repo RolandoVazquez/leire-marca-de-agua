@@ -289,7 +289,7 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // --- DESCARGA SEGURA Y ESTABLE DE VIDEO (EVITA EL ERROR DE COLAPSO) ---
+  // --- DESCARGA LOCAL OPTIMIZADA PARA MÁXIMA VELOCIDAD Y FLUIDEZ NORMAL ---
   btnDownload.addEventListener('click', () => {
     if (isVideoMode && currentVideoFile) {
       btnDownload.textContent = '⏳ Procesando Video...';
@@ -302,18 +302,12 @@ window.addEventListener('DOMContentLoaded', () => {
       vidElement.playsInline = true;
 
       vidElement.onloadedmetadata = () => {
+        // Configuramos el canvas de video con alpha: false para acelerar el rendimiento del celular al máximo
         exportVideoCanvas.width = vidElement.videoWidth;
         exportVideoCanvas.height = vidElement.videoHeight;
-        const ctx = exportVideoCanvas.getContext('2d');
+        const ctx = exportVideoCanvas.getContext('2d', { alpha: false });
 
-        // Usamos una captura optimizada y ligera por stream segura
-        let stream;
-        try {
-          stream = exportVideoCanvas.captureStream(30); // Limitado a 30 FPS estables para evitar sobrecarga de memoria
-        } catch (e) {
-          stream = exportVideoCanvas.captureStream();
-        }
-
+        let stream = exportVideoCanvas.captureStream(30);
         let recordedChunks = [];
         let mediaRecorder;
 
@@ -328,7 +322,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         try {
           mediaRecorder = selectedMimeType ? 
-            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 4000000 }) : 
+            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 5000000 }) : 
             new MediaRecorder(stream);
         } catch (err) {
           mediaRecorder = new MediaRecorder(stream);
@@ -351,9 +345,9 @@ window.addEventListener('DOMContentLoaded', () => {
           btnDownload.disabled = false;
         };
 
-        mediaRecorder.start(100); // Guardar fragmentos cada 100ms para evitar desbordamiento de memoria
+        mediaRecorder.start(100);
         vidElement.currentTime = 0;
-        vidElement.playbackRate = 1.0; // Velocidad normal y fluida
+        vidElement.playbackRate = 1.0; // Velocidad normal idéntica al original
         vidElement.play().catch(err => {
           console.error("Error al reproducir video:", err);
           btnDownload.textContent = '⬇️ Descargar Archivo';
@@ -370,11 +364,11 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
-          // Dibujar video original limpio de fondo
+          // Dibuja el fotograma limpio del video original
           ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
           ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
 
-          // Superponer marca de agua en su posición exacta
+          // Superpone la marca de agua exactamente en la posición configurada
           const opacity = parseFloat(opacityInput.value);
           const sizeVal = parseInt(sizeInput.value);
 
@@ -425,7 +419,6 @@ window.addEventListener('DOMContentLoaded', () => {
       };
 
     } else if (currentImage) {
-      // Tu lógica intacta de imágenes
       exportCanvas.width = currentImage.width;
       exportCanvas.height = currentImage.height;
 
