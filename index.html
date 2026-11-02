@@ -31,6 +31,8 @@
       <input type="file" id="input-camera" accept="image/*" capture="environment" style="display: none;">
       <!-- Input oculto para cargar la imagen secundaria (Logo) -->
       <input type="file" id="input-logo" accept="image/*" style="display: none;">
+      <!-- Input oculto para cargar videos -->
+      <input type="file" id="input-video" accept="video/mp4,video/webm,video/mkv" style="display: none;">
 
       <!-- Area de Vista Previa optimizada con Capas DOM -->
       <div class="editor-stage">
@@ -41,7 +43,7 @@
             <circle cx="8.5" cy="8.5" r="1.5"/>
             <path d="M21 15l-5-5L5 21"/>
           </svg>
-          <p>Selecciona una imagen para comenzar</p>
+          <p>Selecciona una imagen o video para comenzar</p>
           <div class="button-group">
             <button type="button" id="btn-camera" class="btn btn-primary">
               📸 Usar Cámara
@@ -49,10 +51,20 @@
             <button type="button" id="btn-gallery" class="btn btn-secondary">
               🖼️ Abrir Galería
             </button>
+            <button type="button" id="btn-video" class="btn btn-secondary">
+              🎬 Subir Video
+            </button>
+          </div>
+          
+          <!-- Botón elegante y moderno para enlazar "leire-recortador-logo" sin afectar la interfaz -->
+          <div style="margin-top: 15px; border-top: 1px dashed #e2e8f0; pt-3; padding-top: 12px; width: 100%; display: flex; justify-content: center;">
+            <a href="https://rolandovazquez.github.io/leire-recortador-logo/" target="_blank" rel="noopener noreferrer" class="btn" style="background: #f8fafc; color: #d63384; border: 1px solid #d63384; font-size: 12px; padding: 6px 12px; border-radius: 6px; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+              ✂️ Recortar Logo (Leire)
+            </a>
           </div>
         </div>
 
-        <!-- Contenedor de Capas para arrastre ultra fluido -->
+        <!-- Contenedor de Capas para arrastre ultra fluido (Imágenes) -->
         <div id="preview-container" class="hidden" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none;">
           <img id="preview-img" style="max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none; user-select: none;" alt="Preview">
           
@@ -63,8 +75,21 @@
           <img id="logo-layer" class="hidden" style="position: absolute; cursor: grab; user-select: none; max-width: 150px; max-height: 150px; transform: translate(-50%, -50%);" alt="Logo Marca">
         </div>
 
+        <!-- Contenedor de Capas para Videos (Inicialmente oculto, mantiene la misma estructura fluida) -->
+        <div id="video-preview-container" class="hidden" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+          <video id="preview-video" controls style="max-width: 100%; max-height: 100%; object-fit: contain;"></video>
+          
+          <!-- Capa de Texto para Video -->
+          <div id="watermark-layer-video" style="position: absolute; cursor: grab; user-select: none; font-weight: bold; text-shadow: 0px 0px 6px rgba(0,0,0,0.6); white-space: nowrap; transform: translate(-50%, -50%); pointer-events: none;">Leire</div>
+          
+          <!-- Capa de Logo para Video -->
+          <img id="logo-layer-video" class="hidden" style="position: absolute; cursor: grab; user-select: none; max-width: 150px; max-height: 150px; transform: translate(-50%, -50%); pointer-events: none;" alt="Logo Marca Video">
+        </div>
+
         <!-- Canvas oculto para procesar la imagen final al descargar -->
         <canvas id="export-canvas" style="display: none;"></canvas>
+        <!-- Canvas oculto para procesar el video final al descargar -->
+        <canvas id="export-video-canvas" style="display: none;"></canvas>
       </div>
 
       <!-- Panel de Controles de Edición -->
@@ -124,8 +149,8 @@
         </div>
 
         <div class="action-buttons">
-          <button type="button" id="btn-reset" class="btn btn-danger">Cambiar Foto</button>
-          <button type="button" id="btn-download" class="btn btn-success">⬇️ Descargar Foto</button>
+          <button type="button" id="btn-reset" class="btn btn-danger">Cambiar Archivo</button>
+          <button type="button" id="btn-download" class="btn btn-success">⬇️ Descargar Archivo</button>
         </div>
 
       </div>
