@@ -209,7 +209,7 @@ window.addEventListener('DOMContentLoaded', () => {
     logoLayerVideo.style.top = `${logoPosY}%`;
   }
 
-  // --- ARRASTRE FLUIDO E INDEPENDIENTE SOBRE EL CONTENEDOR DE VIDEO ---
+  // --- ARRASTRE LIBRE Y FLUIDO EN VIDEO E IMAGEN ---
   function getContainerCoordinates(e) {
     const activeContainerElement = isVideoMode ? videoPreviewContainer : previewImg;
     const rect = activeContainerElement.getBoundingClientRect();
@@ -255,7 +255,7 @@ window.addEventListener('DOMContentLoaded', () => {
     activeDraggable = null;
   }
 
-  // Asignamos eventos directos y puros para que el texto/logo floten sin interferir con el video
+  // Eventos de puntero directos para mover libremente
   watermarkLayer.addEventListener('pointerdown', (e) => startDrag('text', e));
   watermarkLayerVideo.addEventListener('pointerdown', (e) => startDrag('text', e));
 
@@ -290,7 +290,7 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // --- DESCARGA OPTIMIZADA: EL VIDEO ORIGINAL QUEDA INTACTO Y SE COMPILA AL FINAL ---
+  // --- DESCARGA SEGURA, RÁPIDA Y A PRUEBA DE ERRORES ---
   btnDownload.addEventListener('click', () => {
     if (isVideoMode && currentVideoFile) {
       btnDownload.textContent = '⏳ Procesando Video...';
@@ -311,13 +311,22 @@ window.addEventListener('DOMContentLoaded', () => {
         let recordedChunks = [];
         let mediaRecorder;
 
+        // Selección automática del formato compatible para evitar cualquier error de navegador
+        const mimeTypes = ['video/webm; codecs=vp9', 'video/webm; codecs=vp8', 'video/webm', ''];
+        let selectedMimeType = '';
+        for (let type of mimeTypes) {
+          if (type === '' || MediaRecorder.isTypeSupported(type)) {
+            selectedMimeType = type;
+            break;
+          }
+        }
+
         try {
-          mediaRecorder = new MediaRecorder(stream, { 
-            mimeType: 'video/webm; codecs=vp9',
-            videoBitsPerSecond: 10000000 // Calidad máxima intacta
-          });
+          mediaRecorder = selectedMimeType ? 
+            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 8000000 }) : 
+            new MediaRecorder(stream);
         } catch (err) {
-          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder = new MediaRecorder(stream); // Fallback absoluto a prueba de errores
         }
 
         mediaRecorder.ondataavailable = (event) => {
@@ -339,7 +348,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
         mediaRecorder.start();
         vidElement.currentTime = 0;
-        vidElement.play();
+        vidElement.play().catch(err => {
+          console.error("Error al reproducir video para exportar:", err);
+          btnDownload.textContent = '⬇️ Descargar Archivo';
+          btnDownload.disabled = false;
+        });
 
         function renderExportFrame() {
           if (vidElement.ended || vidElement.paused) {
@@ -349,11 +362,9 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
-          // 1. Dibuja el fotograma limpio del video original
           ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
           ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
 
-          // 2. Superpone la marca de agua exactamente en la posición donde la dejaste configurada
           const opacity = parseFloat(opacityInput.value);
           const sizeVal = parseInt(sizeInput.value);
 
