@@ -35,19 +35,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const exportCanvas = document.getElementById('export-canvas');
   const exportCtx = exportCanvas.getContext('2d');
-  
   const exportVideoCanvas = document.getElementById('export-video-canvas');
   
   const editorControls = document.getElementById('editor-controls');
 
-  // Selectores y grupos de control
   const typeSelector = document.getElementById('watermark-type-selector');
   const textControlsGroup = document.getElementById('text-controls-group');
   const imageControlsGroup = document.getElementById('image-controls-group');
   const colorControlCol = document.getElementById('color-control-col');
   const fontSelect = document.getElementById('watermark-font');
 
-  // Inputs de la marca de agua
   const textInput = document.getElementById('watermark-text');
   const colorInput = document.getElementById('watermark-color');
   const sizeInput = document.getElementById('watermark-size');
@@ -60,7 +57,6 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentVideoFile = null;
   let isVideoMode = false;
 
-  // Posiciones normalizadas en porcentaje (0 a 100)
   let posX = 50; 
   let posY = 50; 
   let logoPosX = 50;
@@ -69,7 +65,6 @@ window.addEventListener('DOMContentLoaded', () => {
   let activeDraggable = null; 
   let isDragging = false;
 
-  // Botones de carga principales
   btnCamera.addEventListener('click', () => inputCamera.click());
   btnGallery.addEventListener('click', () => inputGallery.click());
   btnVideo.addEventListener('click', () => inputVideo.click());
@@ -90,10 +85,7 @@ window.addEventListener('DOMContentLoaded', () => {
           currentVideoFile = null;
           previewImg.src = event.target.result;
           
-          posX = 50;
-          posY = 50;
-          logoPosX = 50;
-          logoPosY = 50;
+          posX = 50; posY = 50; logoPosX = 50; logoPosY = 50;
           updateWatermarkPosition();
           updateLogoPosition();
           
@@ -101,7 +93,6 @@ window.addEventListener('DOMContentLoaded', () => {
           previewContainer.classList.remove('hidden');
           videoPreviewContainer.classList.add('hidden');
           editorControls.classList.remove('hidden');
-          
           updateStyles();
         };
         img.src = event.target.result;
@@ -120,10 +111,7 @@ window.addEventListener('DOMContentLoaded', () => {
       const videoUrl = URL.createObjectURL(file);
       previewVideo.src = videoUrl;
       
-      posX = 50;
-      posY = 50;
-      logoPosX = 50;
-      logoPosY = 50;
+      posX = 50; posY = 50; logoPosX = 50; logoPosY = 50;
       updateWatermarkPosition();
       updateLogoPosition();
 
@@ -131,12 +119,10 @@ window.addEventListener('DOMContentLoaded', () => {
       previewContainer.classList.add('hidden');
       videoPreviewContainer.classList.remove('hidden');
       editorControls.classList.remove('hidden');
-
       updateStyles();
     }
   }
 
-  // Carga de Logo
   btnUploadLogo.addEventListener('click', () => inputLogo.click());
   inputLogo.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -150,8 +136,7 @@ window.addEventListener('DOMContentLoaded', () => {
           logoLayerVideo.src = event.target.result;
           logoLayer.classList.remove('hidden');
           logoLayerVideo.classList.remove('hidden');
-          logoPosX = 50;
-          logoPosY = 50;
+          logoPosX = 50; logoPosY = 50;
           updateLogoPosition();
           updateStyles();
         };
@@ -224,9 +209,8 @@ window.addEventListener('DOMContentLoaded', () => {
     logoLayerVideo.style.top = `${logoPosY}%`;
   }
 
-  // Coordenadas de arrastre optimizadas para el contenedor del video
+  // --- SOLUCIÓN DE ARRASTRE LIBRE Y FLUIDO SOBRE VIDEO ---
   function getContainerCoordinates(e) {
-    // Tomamos el contenedor padre del video para calcular el área exacta de arrastre sin fallos
     const activeContainerElement = isVideoMode ? videoPreviewContainer : previewImg;
     const rect = activeContainerElement.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -271,21 +255,18 @@ window.addEventListener('DOMContentLoaded', () => {
     activeDraggable = null;
   }
 
-  // Eventos de arrastre robustos para texto y logo en video e imagen
-  watermarkLayer.addEventListener('mousedown', (e) => startDrag('text', e));
-  watermarkLayer.addEventListener('touchstart', (e) => startDrag('text', e), { passive: false });
-  watermarkLayerVideo.addEventListener('mousedown', (e) => startDrag('text', e));
-  watermarkLayerVideo.addEventListener('touchstart', (e) => startDrag('text', e), { passive: false });
+  // Habilitamos eventos de puntero directos que funcionan perfecto por encima de los videos en Chrome
+  watermarkLayerVideo.style.pointerEvents = 'auto';
+  logoLayerVideo.style.pointerEvents = 'auto';
 
-  logoLayer.addEventListener('mousedown', (e) => startDrag('logo', e));
-  logoLayer.addEventListener('touchstart', (e) => startDrag('logo', e), { passive: false });
-  logoLayerVideo.addEventListener('mousedown', (e) => startDrag('logo', e));
-  logoLayerVideo.addEventListener('touchstart', (e) => startDrag('logo', e), { passive: false });
+  watermarkLayer.addEventListener('pointerdown', (e) => startDrag('text', e));
+  watermarkLayerVideo.addEventListener('pointerdown', (e) => startDrag('text', e));
 
-  window.addEventListener('mousemove', moveDrag);
-  window.addEventListener('mouseup', stopDrag);
-  window.addEventListener('touchmove', moveDrag, { passive: false });
-  window.addEventListener('touchend', stopDrag);
+  logoLayer.addEventListener('pointerdown', (e) => startDrag('logo', e));
+  logoLayerVideo.addEventListener('pointerdown', (e) => startDrag('logo', e));
+
+  window.addEventListener('pointermove', moveDrag);
+  window.addEventListener('pointerup', stopDrag);
 
   textInput.addEventListener('input', updateStyles);
   fontSelect.addEventListener('change', updateStyles);
@@ -312,7 +293,7 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // Procesamiento de video optimizado para preservar la fluidez y calidad original
+  // --- DESCARGA OPTIMIZADA SIN CÁMARA LENTA ---
   btnDownload.addEventListener('click', () => {
     if (isVideoMode && currentVideoFile) {
       btnDownload.textContent = '⏳ Procesando Video...';
@@ -329,13 +310,16 @@ window.addEventListener('DOMContentLoaded', () => {
         exportVideoCanvas.height = vidElement.videoHeight;
         const ctx = exportVideoCanvas.getContext('2d');
 
-        // Capturamos el stream a los fotogramas nativos del video original para evitar tirones
-        const stream = exportVideoCanvas.captureStream(60); 
+        // Forzamos tasa de bits alta y sin restricciones de lentitud para conservar la calidad intacta
+        const stream = exportVideoCanvas.captureStream();
         let recordedChunks = [];
         let mediaRecorder;
 
         try {
-          mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+          mediaRecorder = new MediaRecorder(stream, { 
+            mimeType: 'video/webm; codecs=vp9',
+            videoBitsPerSecond: 8000000 // Alta calidad de video nítido
+          });
         } catch (err) {
           mediaRecorder = new MediaRecorder(stream);
         }
@@ -361,7 +345,7 @@ window.addEventListener('DOMContentLoaded', () => {
         vidElement.currentTime = 0;
         vidElement.play();
 
-        function renderFrame() {
+        function renderExportFrame() {
           if (vidElement.ended || vidElement.paused) {
             if (mediaRecorder.state !== 'inactive') {
               mediaRecorder.stop();
@@ -411,25 +395,17 @@ window.addEventListener('DOMContentLoaded', () => {
 
           ctx.restore();
           
-          // Sincronización perfecta de fotogramas mediante requestVideoFrameCallback si está disponible
-          if (vidElement.requestVideoFrameCallback) {
-            vidElement.requestVideoFrameCallback(renderFrame);
-          } else {
-            requestAnimationFrame(renderFrame);
+          if (!vidElement.paused && !vidElement.ended) {
+            requestAnimationFrame(renderExportFrame);
           }
         }
 
         vidElement.onplay = () => {
-          if (vidElement.requestVideoFrameCallback) {
-            vidElement.requestVideoFrameCallback(renderFrame);
-          } else {
-            renderFrame();
-          }
+          renderExportFrame();
         };
       };
 
     } else if (currentImage) {
-      // Tu lógica intacta de imágenes
       exportCanvas.width = currentImage.width;
       exportCanvas.height = currentImage.height;
 
