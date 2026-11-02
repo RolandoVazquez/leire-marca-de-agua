@@ -289,7 +289,7 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // --- DESCARGA NATIVA LOCAL ULTRA RÁPIDA Y ESTABLE (SOPORTA VIDEOS LARGOS SIN LAG) ---
+  // --- DESCARGA NATIVA ESTABLE Y A VELOCIDAD REAL (1.0x) SIN CÁMARA LENTA ---
   btnDownload.addEventListener('click', () => {
     if (isVideoMode && currentVideoFile) {
       btnDownload.textContent = '⏳ Procesando Video...';
@@ -302,17 +302,26 @@ window.addEventListener('DOMContentLoaded', () => {
       vidElement.playsInline = true;
 
       vidElement.onloadedmetadata = () => {
-        // Configuramos dimensiones reales del video original
-        exportVideoCanvas.width = vidElement.videoWidth;
-        exportVideoCanvas.height = vidElement.videoHeight;
+        // Corrección inteligente de orientación: Respeta la proporción visual real del video
+        let w = vidElement.videoWidth;
+        let h = vidElement.videoHeight;
+        
+        // Si el video visualmente es horizontal pero los metadatos vienen invertidos
+        if (vidElement.videoWidth < vidElement.videoHeight && vidElement.style.width > vidElement.style.height) {
+          w = vidElement.videoHeight;
+          h = vidElement.videoWidth;
+        }
+
+        exportVideoCanvas.width = w;
+        exportVideoCanvas.height = h;
         const ctx = exportVideoCanvas.getContext('2d', { alpha: false });
 
-        // Captura de stream estable a 30 FPS para garantizar fluidez natural
+        // Captura fija a 30 FPS estables para garantizar sincronía exacta en la reproducción
         let stream = exportVideoCanvas.captureStream(30);
         let recordedChunks = [];
         let mediaRecorder;
 
-        const mimeTypes = ['video/webm; codecs=vp9,opus', 'video/webm; codecs=vp8', 'video/webm', 'video/mp4'];
+        const mimeTypes = ['video/webm; codecs=vp9,opus', 'video/webm; codecs=vp8', 'video/webm'];
         let selectedMimeType = '';
         for (let type of mimeTypes) {
           if (type === '' || MediaRecorder.isTypeSupported(type)) {
@@ -323,7 +332,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         try {
           mediaRecorder = selectedMimeType ? 
-            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 6000000 }) : 
+            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 8000000 }) : 
             new MediaRecorder(stream);
         } catch (err) {
           mediaRecorder = new MediaRecorder(stream);
@@ -346,18 +355,22 @@ window.addEventListener('DOMContentLoaded', () => {
           btnDownload.disabled = false;
         };
 
-        // Iniciar grabación en bloques de 250ms para evitar saturar la memoria del celular
-        mediaRecorder.start(250);
+        mediaRecorder.start(100);
         vidElement.currentTime = 0;
         vidElement.playbackRate = 1.0; 
-        
+
         vidElement.play().catch(err => {
           console.error("Error al reproducir video:", err);
           btnDownload.textContent = '⬇️ Descargar Archivo';
           btnDownload.disabled = false;
         });
 
-        function renderExportFrame() {
+        // Bucle de sincronización exacto a 30 FPS para evitar efecto de cámara lenta
+        const fps = 30;
+        const interval = 1000 / fps;
+        let lastTime = performance.now();
+
+        function renderExportFrame(now) {
           if (vidElement.ended || vidElement.paused) {
             setTimeout(() => {
               if (mediaRecorder.state !== 'inactive') {
@@ -367,57 +380,62 @@ window.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
-          // Dibujar el fotograma original del video intacto de fondo
-          ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
-          ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
+          const elapsed = now - lastTime;
+          if (elapsed >= interval) {
+            lastTime = now - (elapsed % interval);
 
-          // Superponer la marca de agua exactamente en la posición configurada
-          const opacity = parseFloat(opacityInput.value);
-          const sizeVal = parseInt(sizeInput.value);
+            // 1. Dibujar fotograma original limpio de fondo a resolución exacta
+            ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
+            ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
 
-          ctx.save();
-          ctx.globalAlpha = opacity;
+            // 2. Superponer marca de agua en su posición configurada
+            const opacity = parseFloat(opacityInput.value);
+            const sizeVal = parseInt(sizeInput.value);
 
-          if (typeSelector.value === 'text') {
-            const finalX = (posX / 100) * exportVideoCanvas.width;
-            const finalY = (posY / 100) * exportVideoCanvas.height;
-            const scaledFontSize = sizeVal * (exportVideoCanvas.width / 400);
+            ctx.save();
+            ctx.globalAlpha = opacity;
 
-            const text = textInput.value || 'Leire';
-            const color = colorInput.value;
-            const fontFamily = fontSelect.value;
+            if (typeSelector.value === 'text') {
+              const finalX = (posX / 100) * exportVideoCanvas.width;
+              const finalY = (posY / 100) * exportVideoCanvas.height;
+              const scaledFontSize = sizeVal * (exportVideoCanvas.width / 400);
 
-            ctx.font = `bold ${scaledFontSize}px ${fontFamily}`;
-            ctx.fillStyle = color;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowColor = 'rgba(0,0,0,0.6)';
-            ctx.shadowBlur = Math.round(scaledFontSize * 0.15);
+              const text = textInput.value || 'Leire';
+              const color = colorInput.value;
+              const fontFamily = fontSelect.value;
 
-            ctx.fillText(text, finalX, finalY);
+              ctx.font = `bold ${scaledFontSize}px ${fontFamily}`;
+              ctx.fillStyle = color;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.shadowColor = 'rgba(0,0,0,0.6)';
+              ctx.shadowBlur = Math.round(scaledFontSize * 0.15);
 
-          } else if (typeSelector.value === 'image' && currentLogoImage) {
-            const logoW = currentLogoImage.width;
-            const logoH = currentLogoImage.height;
-            
-            const targetLogoWidth = (sizeVal / 100) * exportVideoCanvas.width * 0.8;
-            const targetLogoHeight = (logoH * targetLogoWidth) / logoW;
+              ctx.fillText(text, finalX, finalY);
 
-            const finalLogoX = (logoPosX / 100) * exportVideoCanvas.width - (targetLogoWidth / 2);
-            const finalLogoY = (logoPosY / 100) * exportVideoCanvas.height - (targetLogoHeight / 2);
+            } else if (typeSelector.value === 'image' && currentLogoImage) {
+              const logoW = currentLogoImage.width;
+              const logoH = currentLogoImage.height;
+              
+              const targetLogoWidth = (sizeVal / 100) * exportVideoCanvas.width * 0.8;
+              const targetLogoHeight = (logoH * targetLogoWidth) / logoW;
 
-            ctx.drawImage(currentLogoImage, finalLogoX, finalLogoY, targetLogoWidth, targetLogoHeight);
+              const finalLogoX = (logoPosX / 100) * exportVideoCanvas.width - (targetLogoWidth / 2);
+              const finalLogoY = (logoPosY / 100) * exportVideoCanvas.height - (targetLogoHeight / 2);
+
+              ctx.drawImage(currentLogoImage, finalLogoX, finalLogoY, targetLogoWidth, targetLogoHeight);
+            }
+
+            ctx.restore();
           }
 
-          ctx.restore();
-          
           if (!vidElement.paused && !vidElement.ended) {
             requestAnimationFrame(renderExportFrame);
           }
         }
 
         vidElement.onplay = () => {
-          renderExportFrame();
+          requestAnimationFrame(renderExportFrame);
         };
       };
 
