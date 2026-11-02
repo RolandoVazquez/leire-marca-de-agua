@@ -255,7 +255,6 @@ window.addEventListener('DOMContentLoaded', () => {
     activeDraggable = null;
   }
 
-  // Eventos de puntero directos para mover libremente
   watermarkLayer.addEventListener('pointerdown', (e) => startDrag('text', e));
   watermarkLayerVideo.addEventListener('pointerdown', (e) => startDrag('text', e));
 
@@ -290,7 +289,7 @@ window.addEventListener('DOMContentLoaded', () => {
     previewVideo.src = '';
   });
 
-  // --- DESCARGA SEGURA, RÁPIDA Y A PRUEBA DE ERRORES ---
+  // --- DESCARGA SEGURA Y ESTABLE DE VIDEO (EVITA EL ERROR DE COLAPSO) ---
   btnDownload.addEventListener('click', () => {
     if (isVideoMode && currentVideoFile) {
       btnDownload.textContent = '⏳ Procesando Video...';
@@ -307,11 +306,17 @@ window.addEventListener('DOMContentLoaded', () => {
         exportVideoCanvas.height = vidElement.videoHeight;
         const ctx = exportVideoCanvas.getContext('2d');
 
-        const stream = exportVideoCanvas.captureStream();
+        // Usamos una captura optimizada y ligera por stream segura
+        let stream;
+        try {
+          stream = exportVideoCanvas.captureStream(30); // Limitado a 30 FPS estables para evitar sobrecarga de memoria
+        } catch (e) {
+          stream = exportVideoCanvas.captureStream();
+        }
+
         let recordedChunks = [];
         let mediaRecorder;
 
-        // Selección automática del formato compatible para evitar cualquier error de navegador
         const mimeTypes = ['video/webm; codecs=vp9', 'video/webm; codecs=vp8', 'video/webm', ''];
         let selectedMimeType = '';
         for (let type of mimeTypes) {
@@ -323,10 +328,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
         try {
           mediaRecorder = selectedMimeType ? 
-            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 8000000 }) : 
+            new MediaRecorder(stream, { mimeType: selectedMimeType, videoBitsPerSecond: 4000000 }) : 
             new MediaRecorder(stream);
         } catch (err) {
-          mediaRecorder = new MediaRecorder(stream); // Fallback absoluto a prueba de errores
+          mediaRecorder = new MediaRecorder(stream);
         }
 
         mediaRecorder.ondataavailable = (event) => {
@@ -346,25 +351,30 @@ window.addEventListener('DOMContentLoaded', () => {
           btnDownload.disabled = false;
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(100); // Guardar fragmentos cada 100ms para evitar desbordamiento de memoria
         vidElement.currentTime = 0;
+        vidElement.playbackRate = 1.0; // Velocidad normal y fluida
         vidElement.play().catch(err => {
-          console.error("Error al reproducir video para exportar:", err);
+          console.error("Error al reproducir video:", err);
           btnDownload.textContent = '⬇️ Descargar Archivo';
           btnDownload.disabled = false;
         });
 
         function renderExportFrame() {
           if (vidElement.ended || vidElement.paused) {
-            if (mediaRecorder.state !== 'inactive') {
-              mediaRecorder.stop();
-            }
+            setTimeout(() => {
+              if (mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+              }
+            }, 300);
             return;
           }
 
+          // Dibujar video original limpio de fondo
           ctx.clearRect(0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
           ctx.drawImage(vidElement, 0, 0, exportVideoCanvas.width, exportVideoCanvas.height);
 
+          // Superponer marca de agua en su posición exacta
           const opacity = parseFloat(opacityInput.value);
           const sizeVal = parseInt(sizeInput.value);
 
